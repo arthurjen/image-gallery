@@ -30,6 +30,7 @@ export default {
         this.albums = albums;
       });
   }
+
 };
 </script>
 

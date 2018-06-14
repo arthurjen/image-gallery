@@ -5,15 +5,12 @@ const cors = require('cors');
 app.use(cors());
 app.use(express.json());
 
-const pg = require('pg');
-const Client = pg.Client;
-const databaseUrl = 'postgres://localhost:5432/animals';
-const client = new Client(databaseUrl);
-client.connect();
+const client = require('./db-client');
 
-app.get('/api/albums/stats', (req, res) => {
+app.get('/api/albums/stats', (req, res, next) => {
   client.query(`
   SELECT
+    count(*),
     avg("imageCount"),
     min("imageCount"),
     max("imageCount")
@@ -30,10 +27,11 @@ app.get('/api/albums/stats', (req, res) => {
 ) p;
   `).then(result => {
     res.send(result.rows[0]);
-  });
+  })
+    .catch(next);
 });
 
-app.get('/api/albums', (req, res) => {
+app.get('/api/albums', (req, res, next) => {
   client.query(`
     SELECT
         a.id,
@@ -47,9 +45,10 @@ app.get('/api/albums', (req, res) => {
       ORDER BY a.id;
   `).then(result => {
     res.send(result.rows);
-  });
+  })
+    .catch(next);
 });
-app.get('/api/albums/:id', (req, res) => {
+app.get('/api/albums/:id', (req, res, next) => {
 
   const albumPromise = client.query(`
     SELECT *
@@ -83,10 +82,11 @@ app.get('/api/albums/:id', (req, res) => {
 
       res.send(album);
 
-    });
+    })
+    .catch(next);
 });
 
-app.post('/api/albums', (req, res) => {
+app.post('/api/albums', (req, res, next) => {
   const body = req.body;
 
   client.query(`
@@ -97,10 +97,11 @@ app.post('/api/albums', (req, res) => {
   [body.title, body.description]
   ).then(result => {
     res.send(result.rows[0]);
-  });
+  })
+    .catch(next);
 });
 
-app.put('/api/albums/:id', (req, res) => {
+app.put('/api/albums/:id', (req, res, next) => {
   const body = req.body;
 
   client.query(`
@@ -114,10 +115,11 @@ app.put('/api/albums/:id', (req, res) => {
   [body.title, body.description, req.params.id]
   ).then(result => {
     res.send(result.rows[0]);
-  });
+  })
+    .catch(next);
 });
 
-app.delete('/api/albums/:id', (req, res) => {
+app.delete('/api/albums/:id', (req, res, next) => {
   client.query(`
     DELETE FROM images where album_id = $1;
   `,
@@ -129,11 +131,12 @@ app.delete('/api/albums/:id', (req, res) => {
     [req.params.id]
     )).then(() => {
       res.send({ removed: true });
-    });
+    })
+    .catch(next);
 });
 
 
-app.get('/api/images', (req, res) => {
+app.get('/api/images', (req, res, next) => {
   client.query(`
     SELECT
       id,
@@ -144,10 +147,11 @@ app.get('/api/images', (req, res) => {
     FROM images
   `).then(result => {
     res.send(result.rows);
-  });
+  })
+    .catch(next);
 });
 
-app.post('/api/images', (req, res) => {
+app.post('/api/images', (req, res, next) => {
   const body = req.body;
 
   client.query(`
@@ -158,10 +162,11 @@ app.post('/api/images', (req, res) => {
   [body.albumID, body.title, body.description, body.url]
   ).then(result => {
     res.send(result.rows[0]);
-  });
+  })
+    .catch(next);
 });
 
-app.put('/api/images/:id', (req, res) => {
+app.put('/api/images/:id', (req, res, next) => {
   const body = req.body;
 
   client.query(`
@@ -175,17 +180,27 @@ app.put('/api/images/:id', (req, res) => {
   [body.title, body.description, req.params.id]
   ).then(result => {
     res.send(result.rows[0]);
-  });
+  })
+    .catch(next);
 });
 
-app.delete('/api/images/:id', (req, res) => {
+app.delete('/api/images/:id', (req, res, next) => {
   client.query(`
     DELETE FROM images where id = $1;
   `,
   [req.params.id]
   ).then(() => {
     res.send({ removed: true });
-  });
+  })
+    .catch(next);
+});
+//eslint-disable-next-line
+app.use((err, req, res, next) => {
+  console.log('***SERVER ERROR***\n', err);
+  let message = 'internal server error';
+  if(err.message) message = err.message;
+  else if(typeof err === 'string') message = err;
+  res.status(500).send({ message });
 });
 
 app.listen(3000, () => console.log('server running...'));
